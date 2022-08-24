@@ -4,53 +4,56 @@ import json
 from dotenv import load_dotenv
 import datetime
 import tweepy
-import requests
-from bs4 import BeautifulSoup
+import nltk
+from nltk.tokenize import sent_tokenize, word_tokenize
+from nltk import FreqDist
+import matplotlib.pyplot as plt
+import numpy as np
 
 load_dotenv()
 
-query = input("What do you want to search for?\n")
+bearer_token = os.environ.get("TWITTER_BEARER_TOKEN")
 
-prices_mediamarkt = []
-prices_phone_house = []
-cheapest_mediamarkt = 0 
-cheapest_phone_house = 0
-prices_all = []
+client = tweepy.Client(bearer_token)
 
-def mediamarkt(query):
-  response = requests.request("GET", 'https://www.mediamarkt.es/es/search.html?query='+query+'&filter=category%3ACAT_ES_MM_262')
-  soup = BeautifulSoup(response.text, 'html.parser')
-  prices = soup.find_all('span', 'ScreenreaderTextSpan-sc-11hj9ix-0 kZCfsu') 
-  articles = soup.find_all('p', 'BaseTypo-sc-1jga2g7-0 izkVco StyledInfoTypo-sc-1jga2g7-1 doYUxh')
-  for article in articles:
-    for price in prices:
-      global prices_mediamarkt
-      prices_mediamarkt.append('mm')
-      prices_mediamarkt.append(article.text)
-      prices_mediamarkt.append(float(price.text))
-      
-  # prices_mediamarkt.sort()
-  print(prices_mediamarkt)
-  # global cheapest_mediamarkt
-  # cheapest_mediamarkt = prices_mediamarkt[0]
+query = input('pick a topic to see the most frequent used words\n')
 
-def phone_house(query): 
-  response = requests.request("GET", 'https://www.phonehouse.es/?buscar-texto='+query+'&subcategoria=Smartphones')
-  soup = BeautifulSoup(response.text, 'html.parser')
-  
-  prices = soup.find_all('span', 'precio precio-2') 
-  
-  for price in prices:
-    clean = price.text.replace('€','').replace(',','.')
-    global prices_phone_house
-    prices_phone_house.append(float(clean))
-  prices_phone_house.sort()
-  global cheapest_phone_house
-  cheapest_phone_house = prices_phone_house[0]
-    
-def get_prices():
-  mediamarkt(query)
-  phone_house(query)
-  print(cheapest_mediamarkt, cheapest_phone_house)
+response = client.search_recent_tweets(query, max_results=100)
 
-get_prices()
+with open('tweet.txt', 'w') as tweets:
+  for tweet in response.data:
+    tweets.write("%s\n" % tweet)
+  print('done')
+
+nltk.download('punkt')
+nltk.download('stopwords')
+
+stop_words = [ 'retweet', 'like', 'thanks', 'it', '\'', 'of', ')', '(', '.', '!', ',', '#', '?', ':', 'rt', 'https', '@', 'stop', 'the', 'to', 'and', 'a', 'in', 'it', 'is', 'I', 'that', 'had', 'on', 'for', 'were', 'was']
+filtered_words = []
+words = []
+count = []
+
+source = open('tweet.txt', 'r')
+
+f = source.read()
+
+string = f.lower()
+
+cleaned_up = re.sub('[^A-Za-z0-9]+', '', string)
+
+cleaned_up = word_tokenize(string)
+
+for word in cleaned_up:
+  if word not in stop_words:
+    filtered_words.append(word)
+
+freq = FreqDist(filtered_words)
+most_common = freq.most_common(20)
+for item in most_common:
+  words.append(item[0])
+  count.append(item[1])
+
+plt.plot(words, count)
+plt.ylabel('Word Count')
+plt.xlabel('Words used the most')
+plt.show()
